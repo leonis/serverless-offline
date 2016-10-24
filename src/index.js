@@ -175,7 +175,7 @@ module.exports = S => {
         noTimeout:             userOptions.noTimeout || false,
         httpsProtocol:         userOptions.httpsProtocol || '',
         skipCacheInvalidation: userOptions.skipCacheInvalidation || false,
-        corsAllowOrigin:       userOptions.corsAllowOrigin || '*',
+        corsAllowOrigin:       userOptions.corsAllowOrigin || ' ',
         corsAllowHeaders:      userOptions.corsAllowHeaders || 'accept,content-type,x-api-key',
         corsAllowCredentials:  !userOptions.corsDisallowCredentials,
         dontPrintOutput:       userOptions.dontPrintOutput || false,
@@ -304,7 +304,7 @@ module.exports = S => {
 
           // Prefix must start and end with '/' BUT path must not end with '/'
           let fullPath = this.options.prefix + (epath.startsWith('/') ? epath.slice(1) : epath);
-          if (fullPath !== '/' && fullPath.endsWith('/')) fullPath = path.slice(0, -1);
+          if (fullPath !== '/' && fullPath.endsWith('/')) fullPath = fullPath.slice(0, -1);
 
           serverlessLog(`${method} ${fullPath}`);
 
@@ -430,6 +430,13 @@ module.exports = S => {
                 event = request.payload || {};
               }
 
+              if(event.path){
+                event.path = event.path.replace("/" + event.stage, "");
+                if (!event.path) {
+                  event.path = "/";
+                }
+              }
+
               event.isOffline = true;
               debugLog('event:', event);
 
@@ -519,8 +526,11 @@ module.exports = S => {
                         if (valueArray[2] === 'body') {
 
                           debugLog('Found body in right-hand');
-                          headerValue = (valueArray[3] ? jsonPath(result, valueArray.slice(3).join('.')) : result).toString();
-
+                          try{
+                            headerValue = (valueArray[3] ? jsonPath(result, valueArray.slice(3).join('.')) : result).toString();
+                          }catch(e){
+                            // console.log(headerName);
+                          }
                         } else {
                           printBlankLine();
                           serverlessLog(`Warning: while processing responseParameter "${key}": "${value}"`);
@@ -533,7 +543,7 @@ module.exports = S => {
                       }
                       // Applies the header;
                       debugLog(`Will assign "${headerValue}" to header "${headerName}"`);
-                      response.header(headerName, headerValue);
+                      response.header(headerName, headerValue, { append: headerName.toLowerCase() === 'set-cookie'});
 
                     } else {
                       printBlankLine();
@@ -610,6 +620,107 @@ module.exports = S => {
                 // Bon voyage!
                 response.send();
               });
+
+              //kaneko MOCKはlambdaFunction実行しない
+              if(endpoint.type == "MOCK"){
+                return lambdaContext.done();
+              //kaneko service proxy dynamo getItem対応
+              }else if(endpoint.uri && endpoint.uri.indexOf("dynamodb:action/") != -1){
+                const action = endpoint.uri.split("dynamodb:action/")[1];
+                const aws = require('aws-sdk');
+                const config = {region: this.options.region};
+                config.endpoint = 'http://localhost:8000';
+                aws.config.update(config);
+                const dynamodb = new aws.DynamoDB({apiVersion: '2012-08-10'});
+                delete event.isOffline;
+                switch(action){
+                case "BatchGetItem":
+                  return dynamodb.batchGetItem(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                  break;
+                case "BatchWriteItem":
+                  return dynamodb.batchWriteItem(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                  break;
+                case "CreateTable":
+                  return dynamodb.createTable(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                  break;
+                case "DeleteItem":
+                  return dynamodb.deleteItem(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                  break;
+                case "DeleteTable":
+                  return dynamodb.deleteTable(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                  break;
+                case "DescribeLimits":
+                  return dynamodb.getItem(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                  break;
+                case "DescribeTable":
+                  return dynamodb.describeTable(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                  break;
+                case "GetItem":
+                  return dynamodb.getItem(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                  break;
+                case "ListTables":
+                  return dynamodb.listTables(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                  break;
+                case "PutItem":
+                  return dynamodb.getItem(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                  break;
+                case "Query":
+                  return dynamodb.query(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                  break;
+                case "Scan":
+                  return dynamodb.scan(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                  break;
+                case "UpdateItem":
+                  return dynamodb.updateItem(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                  break;
+                case "UpdateTable":
+                  return dynamodb.updateTable(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                  break;
+                default:
+                }
+              }
 
               // Now we are outside of createLambdaContext, so this happens before the handler gets called:
 
