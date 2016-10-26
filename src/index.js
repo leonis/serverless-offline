@@ -181,6 +181,9 @@ module.exports = S => {
         dontPrintOutput:       userOptions.dontPrintOutput || false,
       };
 
+      const config = S.getProject().custom["serverless-offline"].start || {};
+      this.options.httpsProtocol = config.httpsProtocol || this.options.httpsProtocol;
+
       const stageVariables = stages[this.options.stage];
       this.options.region = userOptions.region || Object.keys(stageVariables.regions)[0];
 
@@ -408,7 +411,7 @@ module.exports = S => {
               let handler; // The lambda function
 
               try {
-                handler = functionHelper.createHandler(funOptions, this.options);
+                handler = functionHelper.createHandler(funRuntime, funOptions, this.options);
               } catch (err) {
                 return this._reply500(response, `Error while loading ${funName}`, err, requestId);
               }
