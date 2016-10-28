@@ -54,7 +54,7 @@ module.exports = function createVelocityContext(request, options, payload) {
       },
       requestId:    `offlineContext_requestId_${Math.random().toString(10).slice(2)}`,
       resourceId:   'offlineContext_resourceId',
-      resourcePath: request.route.path,
+      resourcePath: request.route.path.replace(`/${options.stage}`, '') || '/',
       stage:        options.stage,
     },
     input: {

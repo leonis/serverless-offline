@@ -433,13 +433,6 @@ module.exports = S => {
                 event = request.payload || {};
               }
 
-              if(event.path){
-                event.path = event.path.replace("/" + event.stage, "");
-                if (!event.path) {
-                  event.path = "/";
-                }
-              }
-
               event.isOffline = true;
               debugLog('event:', event);
 
