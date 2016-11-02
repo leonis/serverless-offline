@@ -34,6 +34,10 @@ module.exports = function createVelocityContext(request, options, payload) {
     headers[key.replace(/((?:^|-)[a-z])/g, x => x.toUpperCase())] = request.headers[key];
   }
 
+  if (options.httpsProtocol) {
+    headers["X-Forwarded-Proto"] = "https";
+  }
+
   return {
     context: {
       apiId:      'offlineContext_apiId',

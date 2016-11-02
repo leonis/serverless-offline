@@ -196,6 +196,7 @@ module.exports = S => {
       this.velocityContextOptions = {
         stageVariables,
         stage: this.options.stage,
+        httpsProtocol: this.options.httpsProtocol
       };
 
       // Parse CORS options
