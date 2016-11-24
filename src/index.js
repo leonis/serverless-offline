@@ -307,7 +307,7 @@ class Offline {
 
         // Prefix must start and end with '/' BUT path must not end with '/'
         let fullPath = this.options.prefix + (epath.startsWith('/') ? epath.slice(1) : epath);
-        if (fullPath !== '/' && fullPath.endsWith('/')) fullPath = path.slice(0, -1);
+        if (fullPath !== '/' && fullPath.endsWith('/')) fullPath = fullPath.slice(0, -1);
 
         this.serverlessLog(`${method} ${fullPath}`);
 
