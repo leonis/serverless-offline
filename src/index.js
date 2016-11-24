@@ -655,6 +655,93 @@ class Offline {
               response.send();
             });
 
+            // MOCKはlambdaFunction実行しない
+            if (integration === "MOCK") {
+              return lambdaContext.done();
+            // service proxy dynamo getItem対応
+            } else if (endpoint.uri && endpoint.uri.indexOf("dynamodb:action/") !== -1) {
+              delete event.stageVariables;
+              const action = endpoint.uri.split("dynamodb:action/")[1];
+              const aws = require('aws-sdk');
+              const config = {region: this.options.region};
+              config.endpoint = 'http://localhost:8000';
+              aws.config.update(config);
+              const dynamodb = new aws.DynamoDB({apiVersion: '2012-08-10'});
+              delete event.isOffline;
+              switch (action) {
+                case "BatchGetItem":
+                  return dynamodb.batchGetItem(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                case "BatchWriteItem":
+                  return dynamodb.batchWriteItem(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                case "CreateTable":
+                  return dynamodb.createTable(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                case "DeleteItem":
+                  return dynamodb.deleteItem(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                case "DeleteTable":
+                  return dynamodb.deleteTable(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                case "DescribeLimits":
+                  return dynamodb.getItem(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                case "DescribeTable":
+                  return dynamodb.describeTable(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                case "GetItem":
+                  return dynamodb.getItem(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                case "ListTables":
+                  return dynamodb.listTables(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                case "PutItem":
+                  return dynamodb.getItem(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                case "Query":
+                  return dynamodb.query(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                case "Scan":
+                  return dynamodb.scan(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                case "UpdateItem":
+                  return dynamodb.updateItem(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                case "UpdateTable":
+                  return dynamodb.updateTable(event, (err, data) => {
+                    if (err) return lambdaContext.done(err);
+                    return lambdaContext.done(null, data);
+                  });
+                default:
+              }
+            }
             // Now we are outside of createLambdaContext, so this happens before the handler gets called:
 
             // We cannot use Hapijs's timeout feature because the logic above can take a significant time, so we implement it ourselves
