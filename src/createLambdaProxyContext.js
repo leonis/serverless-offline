@@ -40,7 +40,7 @@ module.exports = function createLambdaProxyContext(request, options, stageVariab
     resource: request.route.path.replace(`/${options.stage}`, '') || '/',
     httpMethod: request.method.toUpperCase(),
     queryStringParameters: utils.nullIfEmpty(request.query),
-    body: request.payload && JSON.stringify(request.payload),
+    body: request.payload && (request.mime === 'application/x-www-form-urlencoded') ? request.payload : JSON.stringify(request.payload),
     stageVariables: utils.nullIfEmpty(stageVariables),
   };
 };
