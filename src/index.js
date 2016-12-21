@@ -32,6 +32,7 @@ class Offline {
   constructor(serverless, options) {
     this.serverless = serverless;
     this.service = serverless.service;
+
     this.serverlessLog = serverless.cli.log.bind(serverless.cli);
     this.options = options;
     this.provider = 'aws';
@@ -279,7 +280,36 @@ class Offline {
       this.serverlessLog(`Routes for ${funName}:`);
 
       // Adds a route for each http endpoint
-      fun.events.forEach(event => {
+      fun.events.forEach((event) => {
+        if (event.schedule) {
+          let milliSeconds;
+          switch (event.schedule) {
+            case "rate(5 minutes)":
+              milliSeconds = 5 * 60 * 1000;
+              break;
+            case "rate(1 minute)":
+              milliSeconds = 1 * 60 * 1000;
+              break;
+            case "rate(15 minutes)":
+              milliSeconds = 15 * 60 * 1000;
+              break;
+            case "rate(1 hour)":
+              milliSeconds = 1 * 60 * 60 * 1000;
+              break;
+            default: // "rate(1 day)"
+              milliSeconds = 24 * 60 * 60 * 1000;
+          }
+          setInterval(function(fun, funOptions, that) {
+            const handler = functionHelper.createHandler(funOptions, that.options);
+            const lambdaContext = createLambdaContext(fun, (err, data) => {
+              if (err) {
+                that.serverlessLog(`[schedule] Failure: ${err}`);
+              }
+              that.serverlessLog(`[schedule] ${data}`);
+            });
+            return handler({"detail-type": "Scheduled Event"}, lambdaContext, lambdaContext.done);
+          }.bind(undefined, fun, funOptions, this), milliSeconds);
+        }
 
         if (!event.http) return;
         if (_.eq(event.http.private, true)) {
