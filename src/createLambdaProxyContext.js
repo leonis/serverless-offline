@@ -8,10 +8,19 @@ const utils = require('./utils');
  */
 module.exports = function createLambdaProxyContext(request, options, stageVariables) {
   const authPrincipalId = request.auth && request.auth.credentials && request.auth.credentials.user;
+  const authContext = (request.auth && request.auth.credentials && request.auth.credentials.context) || {};
+
+  var body = request.payload && JSON.stringify(request.payload);
+  var headers = utils.capitalizeKeys(request.headers);
+
+  if (body) {
+    headers['Content-Length'] = Buffer.byteLength(body);
+    headers['Content-Type'] = 'application/json';
+  }
 
   return {
     path: request.path.replace(`/${options.stage}`, '') || '/',
-    headers: utils.capitalizeKeys(request.headers),
+    headers: headers,
     pathParameters: utils.nullIfEmpty(request.params),
     requestContext: {
       apiId: 'offlineContext_apiId',
@@ -33,14 +42,14 @@ module.exports = function createLambdaProxyContext(request, options, stageVariab
         userAgent: request.headers['user-agent'] || '',
         user: 'offlineContext_user',
       },
-      authorizer: {
+      authorizer: Object.assign(authContext, { // 'principalId' should have higher priority
         principalId: authPrincipalId || process.env.PRINCIPAL_ID || 'offlineContext_authorizer_principalId', // See #24
-      },
+      }),
     },
     resource: request.route.path.replace(`/${options.stage}`, '') || '/',
     httpMethod: request.method.toUpperCase(),
     queryStringParameters: utils.nullIfEmpty(request.query),
-    body: request.payload && (request.mime === 'application/x-www-form-urlencoded') ? request.payload : JSON.stringify(request.payload),
+    body: body,
     stageVariables: utils.nullIfEmpty(stageVariables),
   };
 };

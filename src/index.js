@@ -140,6 +140,7 @@ class Offline {
     this.requests = {};
 
     // Methods
+    this._setEnvironment(); // will set environment variables from serverless.yml file
     this._setOptions();     // Will create meaningful options from cli options
     this._registerBabel();  // Support for ES6
     this._createServer();   // Hapijs boot
@@ -148,8 +149,13 @@ class Offline {
     return this.server;
   }
 
-  _setOptions() {
+  _setEnvironment() {
+    Object.keys(this.service.provider.environment || {}).forEach(key => {
+      process.env[key] = this.service.provider.environment[key];
+    });
+  }
 
+  _setOptions() {
     // Applies defaults
     this.options = {
       host: this.options.host || 'localhost',
@@ -338,6 +344,7 @@ class Offline {
         // Prefix must start and end with '/' BUT path must not end with '/'
         let fullPath = this.options.prefix + (epath.startsWith('/') ? epath.slice(1) : epath);
         if (fullPath !== '/' && fullPath.endsWith('/')) fullPath = fullPath.slice(0, -1);
+        fullPath = fullPath.replace(/\+}/g, '*}');
 
         this.serverlessLog(`${method} ${fullPath}`);
 
@@ -395,12 +402,22 @@ class Offline {
           this.server.auth.scheme(authSchemeName, scheme);
           this.server.auth.strategy(authStrategyName, authSchemeName);
         }
+
+        let cors = null;
+        if (endpoint.cors) {
+          cors = {
+            origin: endpoint.cors.origins || this.options.corsConfig.origin,
+            headers: endpoint.cors.headers || this.options.corsConfig.headers,
+            credentials: endpoint.cors.credentials || this.options.corsConfig.credentials,
+          };
+        }
+
         // Route creation
         this.server.route({
-          method,
+          method: method === 'ANY' ? '*' : method,
           path: fullPath,
           config: {
-            cors: this.options.corsConfig,
+            cors,
             auth: authStrategyName,
           },
           handler: (request, reply) => { // Here we go
@@ -583,7 +600,9 @@ class Offline {
                 };
 
                 this.serverlessLog(`Failure: ${errorMessage}`);
-                if (result.stackTrace) console.log(result.stackTrace.join('\n  '));
+                if (result.stackTrace) {
+                  debugLog(result.stackTrace.join('\n  '));
+                }
 
                 for (const key in endpoint.responses) {
                   if (key === 'default') continue;
@@ -655,7 +674,8 @@ class Offline {
                 });
               }
 
-              let statusCode;
+              let statusCode = 200;
+
               if (integration === 'lambda') {
                 /* RESPONSE TEMPLATE PROCCESSING */
                 // If there is a responseTemplate, we apply it to the result
@@ -688,7 +708,9 @@ class Offline {
                 }
 
                 /* HAPIJS RESPONSE CONFIGURATION */
-                const statusCode = errorStatusCode !== 0 ? errorStatusCode : chosenResponse.statusCode || 200;
+
+                statusCode = errorStatusCode !== 0 ? errorStatusCode : (chosenResponse.statusCode || 200);
+
                 if (!chosenResponse.statusCode) {
                   this.printBlankLine();
                   this.serverlessLog(`Warning: No statusCode found for response "${responseName}".`);
@@ -701,8 +723,10 @@ class Offline {
                 response.source = result;
               }
               else if (integration === 'lambda-proxy') {
-                response.statusCode = statusCode = result.statusCode;
+                response.statusCode = statusCode = result.statusCode || 200;
+
                 const defaultHeaders = { 'Content-Type': 'application/json' };
+
                 Object.assign(response.headers, defaultHeaders, result.headers);
                 if (!_.isUndefined(result.body)) {
                   response.source = result.body;
@@ -901,6 +925,9 @@ class Offline {
   }
 
   _create404Route() {
+    // If a {proxy+} route exists, don't conflict with it
+    if (this.server.match('*', '/{p*}')) return;
+
     this.server.route({
       method: '*',
       path: '/{p*}',

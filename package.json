@@ -1,6 +1,6 @@
 {
   "name": "serverless-offline",
-  "version": "3.4.1",
+  "version": "3.6.0",
   "description": "Emulate AWS λ and API Gateway locally when developing your Serverless project",
   "main": "src/index.js",
   "scripts": {
@@ -49,10 +49,14 @@
     "Marc Campbell (https://github.com/marccampbell)",
     "Martin Micunda (https://github.com/martinmicunda)",
     "Matt Hodgson (https://github.com/mhodgson)",
+    "Matt Jonker (https://github.com/msjonker)",
     "Norimitsu Yamashita (https://github.com/nori3tsu)",
     "Oliv (https://github.com/obearn)",
+    "Paul Esson (https://github.com/thepont)",
     "Piotr Gasiorowski (https://github.com/WooDzu)",
+    "polaris340 (https://github.com/polaris340)",
     "Russell Schick (https://github.com/rschick)",
+    "Shaun (https://github.com/starsprung)",
     "Shine Li (https://github.com/shineli)",
     "Stefan Siegl (https://github.com/stesie)",
     "Tuan Minh Huynh (https://github.com/tuanmh)",
@@ -67,21 +71,21 @@
     "babel-register": "^6.18.0",
     "boom": "^4.2.0",
     "coffee-script": "^1.11.1",
-    "crypto": "0.0.3",
-    "hapi": "15.2.0",
+    "crypto": "^0.0.3",
+    "hapi": "14.2.0",
     "hapi-cors-headers": "^1.0.0",
     "js-string-escape": "^1.0.1",
     "jsonpath-plus": "^0.15.0",
-    "lodash": "^4.16.4",
-    "velocityjs": "^0.9.0"
+    "lodash": "^4.17.2",
+    "velocityjs": "^0.9.1"
   },
   "devDependencies": {
     "chai": "^3.5.0",
     "dirty-chai": "^1.2.2",
-    "eslint-config-airbnb-base": "^9.0.0",
-    "eslint-plugin-import": "^2.0.1",
-    "eslint": "^3.9.0",
-    "mocha": "^3.1.2",
+    "eslint-config-airbnb-base": "^10.0.1",
+    "eslint-plugin-import": "^2.2.0",
+    "eslint": "^3.11.1",
+    "mocha": "^3.2.0",
     "sinon": "^1.17.6"
   }
 }
