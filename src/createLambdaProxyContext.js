@@ -10,14 +10,13 @@ module.exports = function createLambdaProxyContext(request, options, stageVariab
   const authPrincipalId = request.auth && request.auth.credentials && request.auth.credentials.user;
   const authContext = (request.auth && request.auth.credentials && request.auth.credentials.context) || {};
 
-  var body = request.payload && JSON.stringify(request.payload);
+  var body = request.payload && ((request.mime === 'application/x-www-form-urlencoded') ? request.payload : JSON.stringify(request.payload));
   var headers = utils.capitalizeKeys(request.headers);
 
   if (body) {
     headers['Content-Length'] = Buffer.byteLength(body);
-    headers['Content-Type'] = 'application/json';
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
   }
-
   return {
     path: request.path.replace(`/${options.stage}`, '') || '/',
     headers: headers,
