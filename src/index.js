@@ -856,6 +856,12 @@ class Offline {
 
             // Finally we call the handler
             debugLog('_____ CALLING HANDLER _____');
+
+            // lambdaではロセス引き継がれないはずなので削除する
+            Object.keys(process._events).forEach((key) => {
+              process.removeAllListeners(key);
+            });
+
             try {
               const x = handler(event, lambdaContext, lambdaContext.done);
 
