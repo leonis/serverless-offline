@@ -124,6 +124,9 @@ class Offline {
 
   // Entry point for the plugin (sls offline)
   start() {
+    // serverless-offlineではunhandledRejection捕捉しない
+    process.removeAllListener('unhandledRejection');
+
     const version = this.serverless.version;
 
     if (!version.startsWith('1.')) {
