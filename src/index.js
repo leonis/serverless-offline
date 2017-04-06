@@ -198,7 +198,7 @@ class Offline {
   _registerBabel(isBabelRuntime, babelRuntimeOptions) {
 
     const options = isBabelRuntime ?
-      babelRuntimeOptions || { presets: ['es2015'] } :
+    babelRuntimeOptions || { presets: ['es2015'] } :
       this.globalBabelOptions;
 
     if (options) {
@@ -343,57 +343,10 @@ class Offline {
 
         // If the endpoint has an authorization function, create an authStrategy for the route
         let authStrategyName = null;
+        let externed = _.get(endpoint, 'authorizer.externed'); // extern auth function
 
         if (endpoint.authorizer) {
-          let authFunctionName = endpoint.authorizer;
-          if (typeof endpoint.authorizer === 'object') {
-            if (endpoint.authorizer.arn) {
-              this.serverlessLog(`WARNING: Serverless Offline does not support non local authorizers: ${endpoint.authorizer.arn}`);
-
-              return;
-            }
-            authFunctionName = endpoint.authorizer.name;
-          }
-
-          this.serverlessLog(`Configuring Authorization: ${endpoint.path} ${authFunctionName}`);
-
-          const authFunction = this.service.getFunction(authFunctionName);
-
-          if (!authFunction) return this.serverlessLog(`WARNING: Authorization function ${authFunctionName} does not exist`);
-
-          let authorizerOptions = {};
-          if (typeof endpoint.authorizer === 'string') {
-            // serverless 1.x will create default values, so we will to
-            authorizerOptions.name = authFunctionName;
-            authorizerOptions.resultTtlInSeconds = '300';
-            authorizerOptions.identitySource = 'method.request.header.Authorization';
-          }
-          else {
-            authorizerOptions = endpoint.authorizer;
-          }
-
-          // Create a unique scheme per endpoint
-          // This allows the methodArn on the event property to be set appropriately
-          const authKey = `${funName}-${authFunctionName}-${method}-${epath}`;
-          const authSchemeName = `scheme-${authKey}`;
-          authStrategyName = `strategy-${authKey}`; // set strategy name for the route config
-
-          debugLog(`Creating Authorization scheme for ${authKey}`);
-
-          // Create the Auth Scheme for the endpoint
-          const scheme = createAuthScheme(
-            authFunction,
-            authorizerOptions,
-            funName,
-            epath,
-            this.options,
-            this.serverlessLog,
-            servicePath
-          );
-
-          // Set the auth scheme and strategy on the server
-          this.server.auth.scheme(authSchemeName, scheme);
-          this.server.auth.strategy(authStrategyName, authSchemeName);
+          authStrategyName = this._createAuthScheme(endpoint, funName, method, externed);
         }
         // Route creation
         this.server.route({
@@ -449,44 +402,44 @@ class Offline {
               }
             } else if (contentType === 'application/x-www-form-urlencoded') {
               var param = function (a) {
-                  var s = [], rbracket = /\[\]$/,
-                      isArray = function (obj) {
-                          return Object.prototype.toString.call(obj) === '[object Array]';
-                      }, add = function (k, v) {
-                          v = typeof v === 'function' ? v() : v === null ? '' : v === undefined ? '' : v;
-                          s[s.length] = encodeURIComponent(k) + '=' + encodeURIComponent(v);
-                      }, buildParams = function (prefix, obj) {
-                          var i, len, key;
+                var s = [], rbracket = /\[\]$/,
+                  isArray = function (obj) {
+                    return Object.prototype.toString.call(obj) === '[object Array]';
+                  }, add = function (k, v) {
+                    v = typeof v === 'function' ? v() : v === null ? '' : v === undefined ? '' : v;
+                    s[s.length] = encodeURIComponent(k) + '=' + encodeURIComponent(v);
+                  }, buildParams = function (prefix, obj) {
+                    var i, len, key;
 
-                          if (prefix) {
-                              if (isArray(obj)) {
-                                  for (i = 0, len = obj.length; i < len; i++) {
-                                      if (rbracket.test(prefix)) {
-                                          add(prefix, obj[i]);
-                                      } else {
-                                          buildParams(prefix + '[' + (typeof obj[i] === 'object' ? i : '') + ']', obj[i]);
-                                      }
-                                  }
-                              } else if (obj && String(obj) === '[object Object]') {
-                                  for (key in obj) {
-                                      buildParams(prefix + '[' + key + ']', obj[key]);
-                                  }
-                              } else {
-                                  add(prefix, obj);
-                              }
-                          } else if (isArray(obj)) {
-                              for (i = 0, len = obj.length; i < len; i++) {
-                                  add(obj[i].name, obj[i].value);
-                              }
+                    if (prefix) {
+                      if (isArray(obj)) {
+                        for (i = 0, len = obj.length; i < len; i++) {
+                          if (rbracket.test(prefix)) {
+                            add(prefix, obj[i]);
                           } else {
-                              for (key in obj) {
-                                  buildParams(key, obj[key]);
-                              }
+                            buildParams(prefix + '[' + (typeof obj[i] === 'object' ? i : '') + ']', obj[i]);
                           }
-                          return s;
-                      };
+                        }
+                      } else if (obj && String(obj) === '[object Object]') {
+                        for (key in obj) {
+                          buildParams(prefix + '[' + key + ']', obj[key]);
+                        }
+                      } else {
+                        add(prefix, obj);
+                      }
+                    } else if (isArray(obj)) {
+                      for (i = 0, len = obj.length; i < len; i++) {
+                        add(obj[i].name, obj[i].value);
+                      }
+                    } else {
+                      for (key in obj) {
+                        buildParams(key, obj[key]);
+                      }
+                    }
+                    return s;
+                  };
 
-                  return buildParams('', a).join('&').replace(/%20/g, '+');
+                return buildParams('', a).join('&').replace(/%20/g, '+');
               };
               request.payload = param(request.payload);
             }
@@ -501,7 +454,10 @@ class Offline {
             let handler; // The lambda function
 
             try {
-              handler = functionHelper.createHandler(funOptions, this.options);
+              handler = functionHelper.createHandler(
+                funOptions,
+                Object.assign({externed: externed}, this.options)
+              );
             } catch (err) {
               return this._reply500(response, `Error while loading ${funName}`, err, requestId);
             }
@@ -730,7 +686,7 @@ class Offline {
             // MOCKはlambdaFunction実行しない
             if (integration === "MOCK") {
               return lambdaContext.done();
-            // service proxy dynamo getItem対応
+              // service proxy dynamo getItem対応
             } else if (endpoint.uri && endpoint.uri.indexOf("dynamodb:action/") !== -1) {
               delete event.stageVariables;
               const action = endpoint.uri.split("dynamodb:action/")[1];
@@ -911,9 +867,9 @@ class Offline {
           error: 'Serverless-offline: route not found.',
           currentRoute: `${request.method} - ${request.path}`,
           existingRoutes: this.server.table()[0].table
-            .filter(route => route.path !== '/{p*}') // Exclude this (404) route
-            .sort((a, b) => a.path <= b.path ? -1 : 1) // Sort by path
-            .map(route => `${route.method} - ${route.path}`), // Human-friendly result
+          .filter(route => route.path !== '/{p*}') // Exclude this (404) route
+          .sort((a, b) => a.path <= b.path ? -1 : 1) // Sort by path
+          .map(route => `${route.method} - ${route.path}`), // Human-friendly result
         });
         response.statusCode = 404;
       },
@@ -926,6 +882,61 @@ class Offline {
     const splittedStack = stack.split('\n');
 
     return splittedStack.slice(0, splittedStack.findIndex(item => item.match(/server.route.handler.createLambdaContext/))).map(line => line.trim());
+  }
+
+  _createAuthScheme(endpoint, funName, method, externed) {
+    const epath = endpoint.path;
+    let authFunctionName = endpoint.authorizer;
+    if (typeof endpoint.authorizer === 'object') {
+      if (endpoint.authorizer.arn) {
+        this.serverlessLog(`WARNING: Serverless Offline does not support non local authorizers: ${endpoint.authorizer.arn}`);
+        return;
+      }
+      authFunctionName = endpoint.authorizer.name;
+    }
+    this.serverlessLog(`Configuring Authorization: ${endpoint.path} ${authFunctionName}`);
+    let authFunction;
+    if (externed) {
+      authFunction = require(authFunctionName);
+    } else {
+      authFunction = this.service.getFunction(authFunctionName);
+    }
+    if (!authFunction) return this.serverlessLog(`WARNING: Authorization function ${authFunctionName} does not exist`);
+
+    let authorizerOptions = {};
+    if (typeof endpoint.authorizer === 'string') {
+      // serverless 1.x will create default values, so we will to
+      authorizerOptions.name = authFunctionName;
+      authorizerOptions.resultTtlInSeconds = '300';
+      authorizerOptions.identitySource = 'method.request.header.Authorization';
+    }
+    else {
+      authorizerOptions = endpoint.authorizer;
+    }
+
+    // Create a unique scheme per endpoint
+    // This allows the methodArn on the event property to be set appropriately
+    const authKey = `${funName}-${authFunctionName}-${method}-${epath}`;
+    const authSchemeName = `scheme-${authKey}`;
+    const authStrategyName = `strategy-${authKey}`; // set strategy name for the route config
+
+    debugLog(`Creating Authorization scheme for ${authKey}`);
+
+    // Create the Auth Scheme for the endpoint
+    const scheme = createAuthScheme(
+      authFunction,
+      authorizerOptions,
+      funName,
+      epath,
+      Object.assign({externed: externed}, this.options),
+      this.serverlessLog,
+      this.serverless.config.servicePath
+    );
+
+    // Set the auth scheme and strategy on the server
+    this.server.auth.scheme(authSchemeName, scheme);
+    this.server.auth.strategy(authStrategyName, authSchemeName);
+    return authStrategyName;
   }
 
   _logAndExit() {

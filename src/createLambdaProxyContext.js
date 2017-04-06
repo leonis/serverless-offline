@@ -7,8 +7,7 @@ const utils = require('./utils');
  http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-create-api-as-simple-proxy-for-lambda.html
  */
 module.exports = function createLambdaProxyContext(request, options, stageVariables) {
-  const authPrincipalId = request.auth && request.auth.credentials && request.auth.credentials.user;
-
+  const auth = request.auth && request.auth.credentials && request.auth.credentials.user;
   return {
     path: request.path.replace(`/${options.stage}`, '') || '/',
     headers: utils.capitalizeKeys(request.headers),
@@ -33,9 +32,7 @@ module.exports = function createLambdaProxyContext(request, options, stageVariab
         userAgent: request.headers['user-agent'] || '',
         user: 'offlineContext_user',
       },
-      authorizer: {
-        principalId: authPrincipalId || process.env.PRINCIPAL_ID || 'offlineContext_authorizer_principalId', // See #24
-      },
+      authorizer: auth || null,
     },
     resource: request.route.path.replace(`/${options.stage}`, '') || '/',
     httpMethod: request.method.toUpperCase(),

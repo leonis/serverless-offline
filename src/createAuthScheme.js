@@ -1,7 +1,7 @@
 'use strict';
 
 const Boom = require('boom');
-
+const _ = require('lodash');
 const createLambdaContext = require('./createLambdaContext');
 const functionHelper = require('./functionHelper');
 const debugLog = require('./debugLog');
@@ -15,7 +15,10 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
   }
 
   const identityHeader = identitySourceMatch[1].toLowerCase();
-  const funOptions = functionHelper.getFunctionOptions(authFun, funName, servicePath);
+  let funOptions;
+  if (!options.externed) {
+    funOptions = functionHelper.getFunctionOptions(authFun, funName, servicePath);
+  }
 
   // Create Auth Scheme
   return () => ({
@@ -43,7 +46,11 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
       let handler;
 
       try {
-        handler = functionHelper.createHandler(funOptions, options);
+        if (options.externed) {
+          handler = authFun.handler;
+        } else {
+          handler = functionHelper.createHandler(funOptions, options);
+        }
       } catch (err) {
         return reply(Boom.badImplementation(null, `Error while loading ${authFunName}`));
       }
@@ -61,7 +68,7 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
         }
 
         const onSuccess = (policy) => {
-        // Validate that the policy document has the principalId set
+          // Validate that the policy document has the principalId set
           if (!policy.principalId) {
             serverlessLog(`Authorization response did not include a principalId: (λ: ${authFunName})`, err);
             return reply(Boom.forbidden('No principalId set on the Response'));
@@ -69,8 +76,23 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
 
           serverlessLog(`Authorization function returned a successful response: (λ: ${authFunName})`, policy);
 
+          const user = {principalId: result.principalId};
+
+          if (result && result.context) {
+            const keys = ['stringKey', 'numberKey', 'booleanKey'];
+            Object.keys(result.context).forEach((k) => {
+              if (_.includes(keys, k)) {
+                user[k] = result.context[k];
+              }
+            });
+          }
+
           // Set the credentials for the rest of the pipeline
-          return reply.continue({ credentials: { user: policy.principalId } });
+          return reply.continue({
+            credentials: {
+              user: user
+            }
+          });
         };
 
         if (result && typeof result.then === 'function' && typeof result.catch === 'function') {

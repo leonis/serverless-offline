@@ -20,13 +20,13 @@ function escapeJavaScript(x) {
 }
 
 /*
-  Returns a context object that mocks APIG mapping template reference
-  http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-mapping-template-reference.html
-*/
+ Returns a context object that mocks APIG mapping template reference
+ http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-mapping-template-reference.html
+ */
 module.exports = function createVelocityContext(request, options, payload) {
 
   const path = x => jsonPath(payload || {}, x);
-  const authPrincipalId = request.auth && request.auth.credentials && request.auth.credentials.user;
+  const auth = request.auth && request.auth.credentials && request.auth.credentials.user;
 
   // Capitalize request.headers as NodeJS use lowercase headers
   // however API Gateway always pass capitalize headers
@@ -35,9 +35,7 @@ module.exports = function createVelocityContext(request, options, payload) {
   return {
     context: {
       apiId:      'offlineContext_apiId',
-      authorizer: {
-        principalId: authPrincipalId || process.env.PRINCIPAL_ID || 'offlineContext_authorizer_principalId', // See #24
-      },
+      authorizer: auth || null,
       httpMethod: request.method.toUpperCase(),
       identity:   {
         accountId:                     'offlineContext_accountId',
@@ -59,12 +57,12 @@ module.exports = function createVelocityContext(request, options, payload) {
       body: payload, // Not a string yet, todo
       json:   x => JSON.stringify(path(x)),
       params: x => typeof x === 'string' ?
-        request.params[x] || request.query[x] || headers[x] :
-        {
-          path:        Object.assign({}, request.params),
-          querystring: Object.assign({}, request.query),
-          header:      headers,
-        },
+      request.params[x] || request.query[x] || headers[x] :
+      {
+        path:        Object.assign({}, request.params),
+        querystring: Object.assign({}, request.query),
+        header:      headers,
+      },
       path,
     },
     stageVariables: options.stageVariables,
