@@ -87,7 +87,6 @@ module.exports = function createAuthScheme(authFun, authorizerOptions, funName, 
             });
           }
 
-          // Set the credentials for the rest of the pipeline
           return reply.continue({
             credentials: {
               user: user

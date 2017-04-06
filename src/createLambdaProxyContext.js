@@ -8,9 +8,15 @@ const utils = require('./utils');
  */
 module.exports = function createLambdaProxyContext(request, options, stageVariables) {
   const auth = request.auth && request.auth.credentials && request.auth.credentials.user;
+  var body = request.payload && ((request.mime === 'application/x-www-form-urlencoded') ? request.payload : JSON.stringify(request.payload));
+  var headers = utils.capitalizeKeys(request.headers);
+  if (body) {
+    headers['Content-Length'] = Buffer.byteLength(body);
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+  }
   return {
     path: request.path.replace(`/${options.stage}`, '') || '/',
-    headers: utils.capitalizeKeys(request.headers),
+    headers: headers,
     pathParameters: utils.nullIfEmpty(request.params),
     requestContext: {
       apiId: 'offlineContext_apiId',
@@ -37,7 +43,7 @@ module.exports = function createLambdaProxyContext(request, options, stageVariab
     resource: request.route.path.replace(`/${options.stage}`, '') || '/',
     httpMethod: request.method.toUpperCase(),
     queryStringParameters: utils.nullIfEmpty(request.query),
-    body: request.payload && (request.mime === 'application/x-www-form-urlencoded') ? request.payload : JSON.stringify(request.payload),
+    body: body,
     stageVariables: utils.nullIfEmpty(stageVariables),
   };
 };

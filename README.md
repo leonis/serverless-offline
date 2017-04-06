@@ -17,14 +17,12 @@ To do so, it starts an HTTP server that handles the request's lifecycle like API
 - [Usage and command line options](https://github.com/dherault/serverless-offline#usage-and-command-line-options)
 - [Usage with Babel](https://github.com/dherault/serverless-offline#usage-with-babel)
 - [Usage with CoffeeScript](https://github.com/dherault/serverless-offline#usage-with-coffeescript)
-- [Token Authorizers](https:////github.com/dhrault/serverless-offline#token-authorizers)
+- [Token Authorizers](https://github.com/dherault/serverless-offline#token-authorizers)
 - [Custom authorizers](https://github.com/dherault/serverless-offline#custom-authorizers)
-- [AWS API Gateway Integrations](https://github.com/dherault/serverless-offline#aws-api-gateway-integrations)
-- [Response parameters](https://github.com/dherault/serverless-offline#response-parameters)
-- [Using Velocity Templates for API Gateway](https://github.com/dherault/serverless-offline#using-velocity-templates-for-api-gateway)
+- [AWS API Gateway Features](https://github.com/dherault/serverless-offline#aws-api-gateway-features)
+- [Velocity nuances](https://github.com/dherault/serverless-offline#velocity-nuances)
 - [Debug process](https://github.com/dherault/serverless-offline#debug-process)
 - [Simulation quality](https://github.com/dherault/serverless-offline#simulation-quality)
-- [Velocity nuances](https://github.com/dherault/serverless-offline#velocity-nuances)
 - [Credits and inspiration](https://github.com/dherault/serverless-offline#credits-and-inspiration)
 - [Contributing](https://github.com/dherault/serverless-offline#contributing)
 - [License](https://github.com/dherault/serverless-offline#license)
@@ -71,12 +69,13 @@ All CLI options are optional:
 --stage                 -s  The stage used to populate your templates. Default: the first stage found in your project.
 --region                -r  The region used to populate your templates. Default: the first region for the first stage found.
 --noTimeout             -t  Disables the timeout feature.
+--noEnvironment             Turns of loading of your environment variables from serverless.yml. Allows the usage of tools such as PM2 or docker-compose.
 --dontPrintOutput           Turns of logging of your lambda outputs in the terminal.
 --httpsProtocol         -H  To enable HTTPS, specify directory (relative to your cwd, typically your project dir) for both cert.pem and key.pem files.
 --skipCacheInvalidation -c  Tells the plugin to skip require cache invalidation. A script reloading tool like Nodemon might then be needed.
---corsAllowOrigin           Used to build the Access-Control-Allow-Origin header for all responses.  Delimit multiple values with commas. Default: '*'
---corsAllowHeaders          Used to build the Access-Control-Allow-Headers header for all responses.  Delimit multiple values with commas. Default: 'accept,content-type,x-api-key'
---corsDisallowCredentials   When provided, the Access-Control-Allow-Credentials header will be passed as 'false'. Default: true
+--corsAllowOrigin           Used as default Access-Control-Allow-Origin header value for responses. Delimit multiple values with commas. Default: '*'
+--corsAllowHeaders          Used as default Access-Control-Allow-Headers header value for responses. Delimit multiple values with commas. Default: 'accept,content-type,x-api-key'
+--corsDisallowCredentials   When provided, the default Access-Control-Allow-Credentials header value will be passed as 'false'. Default: true
 ```
 
 By default you can send your requests to `http://localhost:3000/`. Please note that:
@@ -116,7 +115,6 @@ As defined in the [Serverless Documentation](https://serverless.com/framework/do
 
 Serverless-offline will emulate the behaviour of APIG and create a random token for each key defined and print it on screen. With these tokens you can access your private methods adding `x-api-key: generatedToken` to your request header.
 
-
 ## Custom authorizers
 
 Only [custom authorizers](https://aws.amazon.com/blogs/compute/introducing-custom-authorizers-in-amazon-api-gateway/) are supported. Custom authorizers are executed before a Lambda function is executed and return an Error or a Policy document.
@@ -140,24 +138,53 @@ The plugin only supports retrieving Tokens from headers. You can configure the h
 }
 ```
 
-## AWS API Gateway Integrations
+## AWS API Gateway Features
 
-The plugin is capable of handling lambda-proxy and lambda integration endpoints.
-For additional details, check the [Serverless AWS API Gateway Integration Types Docs](https://serverless.com/framework/docs/providers/aws/events/apigateway/#integration-types).
+### Velocity Templates
 
-#### Lambda Proxy Integration
+[Serverless doc](https://serverless.com/framework/docs/providers/aws/events/apigateway#request-templates)
+~ [AWS doc](http://docs.aws.amazon.com/apigateway/latest/developerguide/models-mappings.html#models-mappings-mappings)
 
-Lambda Proxy integration type does not have any additional configuration parameters.
+You can supply response and request templates for each function. This is optional. To do so you will have to place function specific template files in the same directory as your function file and add the .req.vm extension to the template filename.
+For example,
+if your function is in code-file: `helloworld.js`,
+your response template should be in file: `helloworld.res.vm` and your request template in file `helloworld.req.vm`.
 
-#### Lambda Integration
+### CORS
 
-Lambda integration type has the following configuration parameters:
+[Serverless doc](https://serverless.com/framework/docs/providers/aws/events/apigateway#enabling-cors)
 
-## Response parameters
+If the endpoint config has CORS set to true, the plugin will use the CLI CORS options for the associated route.
+Otherwise, no CORS headers will be added.
 
-You can set your response's headers using ResponseParameters. See the [APIG docs](http://docs.aws.amazon.com/apigateway/latest/developerguide/request-response-data-mappings.html#mapping-response-parameters).
+### Catch-all Path Variables
 
-Example:
+[AWS doc](https://aws.amazon.com/blogs/aws/api-gateway-update-new-features-simplify-api-development/)
+
+Set greedy paths like `/store/{proxy+}` that will intercept requests made to `/store/list-products`, `/store/add-product`, etc...
+
+### ANY method
+
+[AWS doc](https://aws.amazon.com/blogs/aws/api-gateway-update-new-features-simplify-api-development/)
+
+Works out of the box.
+
+### Lambda and Lambda Proxy Integrations
+
+[Serverless doc](https://serverless.com/framework/docs/providers/aws/events/apigateway#lambda-proxy-integration)
+ ~ [AWS doc](http://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-create-api-as-simple-proxy-for-lambda.html)
+
+Works out of the box. See examples in the manual_test directory.
+
+### Response parameters
+
+[AWS doc](http://docs.aws.amazon.com/apigateway/latest/developerguide/request-response-data-mappings.html#mapping-response-parameters)
+
+You can set your response's headers using ResponseParameters.
+
+May not work properly. Please PR. (Difficulty: hard?)
+
+Example response velocity template:
 ```javascript
 "responseParameters": {
   "method.response.header.X-Powered-By": "Serverless", // a string
@@ -165,16 +192,6 @@ Example:
   "method.response.header.Location": "integration.response.body.some.key" // a pseudo JSON-path
 },
 ```
-
-## Using Velocity Templates for API Gateway
-
-The API Gateway uses velocity markup templates (https://en.wikipedia.org/wiki/Apache_Velocity) for customization of request and responses. Serverless offline plugin can mimick this and the templates can be provided either globally or per function.
-The default templates are located in the *src* path of the project. The default request template is located in file `offline-default.req.vm` and the default response template is located in `offline-default.res.vm`.
-
-In addition, you can supply response and request templates for each function. This is optional. To do so you will have to place function specific template files in the same directory as your function file and add the .req.vm extension to the template filename.
-For example:
-if your function is in code-file: `helloworld.js`
-your response template should be in file: `helloworld.res.vm` and your request template in file `helloworld.req.vm`.
 
 ## Velocity nuances
 
@@ -249,8 +266,10 @@ This plugin was initially a fork of [Nopik](https://github.com/Nopik/)'s [Server
 
 ## Contributing
 
-Yes, thanks you! Please update the docs accordingly. There is no test suite or linting for this project. We try to follow [Airbnb's JavaScript Style Guide](https://github.com/airbnb/javascript).
-
+Yes, thank you!
+This plugin is community-driven, most of its features are from different authors.
+Please update the docs and tests and add your name to the package.json file.
+We try to follow [Airbnb's JavaScript Style Guide](https://github.com/airbnb/javascript).
 
 ## License
 

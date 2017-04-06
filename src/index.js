@@ -88,6 +88,9 @@ class Offline {
             usage: 'Disable the timeout feature.',
             shortcut: 't',
           },
+          noEnvironment: {
+            usage: 'Turns of loading of your environment variables from serverless.yml. Allows the usage of tools such as PM2 or docker-compose.',
+          },
           dontPrintOutput: {
             usage: 'Turns of logging of your lambda outputs in the terminal.',
           },
@@ -121,6 +124,9 @@ class Offline {
 
   // Entry point for the plugin (sls offline)
   start() {
+    // serverless-offlineではunhandledRejection捕捉しない
+    process.removeAllListeners('unhandledRejection');
+
     const version = this.serverless.version;
 
     if (!version.startsWith('1.')) {
@@ -141,6 +147,7 @@ class Offline {
 
     // Methods
     this._setOptions();     // Will create meaningful options from cli options
+    this._setEnvironment(); // will set environment variables from serverless.yml file
     this._registerBabel();  // Support for ES6
     this._createServer();   // Hapijs boot
     this._createRoutes();   // API  Gateway emulation
@@ -148,8 +155,14 @@ class Offline {
     return this.server;
   }
 
-  _setOptions() {
+  _setEnvironment() {
+    if (this.options.noEnvironment) return;
+    Object.keys(this.service.provider.environment || {}).forEach(key => {
+      process.env[key] = this.service.provider.environment[key];
+    });
+  }
 
+  _setOptions() {
     // Applies defaults
     this.options = {
       host: this.options.host || 'localhost',
@@ -159,6 +172,7 @@ class Offline {
       stage: this.service.provider.stage,
       region: this.service.provider.region,
       noTimeout: this.options.noTimeout || false,
+      noEnvironment: this.options.noEnvironment || false,
       dontPrintOutput: this.options.dontPrintOutput || false,
       httpsProtocol: this.options.httpsProtocol || '',
       skipCacheInvalidation: this.options.skipCacheInvalidation || false,
@@ -338,6 +352,7 @@ class Offline {
         // Prefix must start and end with '/' BUT path must not end with '/'
         let fullPath = this.options.prefix + (epath.startsWith('/') ? epath.slice(1) : epath);
         if (fullPath !== '/' && fullPath.endsWith('/')) fullPath = fullPath.slice(0, -1);
+        fullPath = fullPath.replace(/\+}/g, '*}');
 
         this.serverlessLog(`${method} ${fullPath}`);
 
@@ -348,12 +363,22 @@ class Offline {
         if (endpoint.authorizer) {
           authStrategyName = this._createAuthScheme(endpoint, funName, method, externed);
         }
+
+        let cors = null;
+        if (endpoint.cors) {
+          cors = {
+            origin: endpoint.cors.origins || this.options.corsConfig.origin,
+            headers: endpoint.cors.headers || this.options.corsConfig.headers,
+            credentials: endpoint.cors.credentials || this.options.corsConfig.credentials,
+          };
+        }
+
         // Route creation
         this.server.route({
-          method,
+          method: method === 'ANY' ? '*' : method,
           path: fullPath,
           config: {
-            cors: this.options.corsConfig,
+            cors,
             auth: authStrategyName,
           },
           handler: (request, reply) => { // Here we go
@@ -539,7 +564,9 @@ class Offline {
                 };
 
                 this.serverlessLog(`Failure: ${errorMessage}`);
-                if (result.stackTrace) console.log(result.stackTrace.join('\n  '));
+                if (result.stackTrace) {
+                  debugLog(result.stackTrace.join('\n  '));
+                }
 
                 for (const key in endpoint.responses) {
                   if (key === 'default') continue;
@@ -611,7 +638,8 @@ class Offline {
                 });
               }
 
-              let statusCode;
+              let statusCode = 200;
+
               if (integration === 'lambda') {
                 /* RESPONSE TEMPLATE PROCCESSING */
                 // If there is a responseTemplate, we apply it to the result
@@ -644,7 +672,9 @@ class Offline {
                 }
 
                 /* HAPIJS RESPONSE CONFIGURATION */
-                const statusCode = errorStatusCode !== 0 ? errorStatusCode : chosenResponse.statusCode || 200;
+
+                statusCode = errorStatusCode !== 0 ? errorStatusCode : (chosenResponse.statusCode || 200);
+
                 if (!chosenResponse.statusCode) {
                   this.printBlankLine();
                   this.serverlessLog(`Warning: No statusCode found for response "${responseName}".`);
@@ -657,8 +687,10 @@ class Offline {
                 response.source = result;
               }
               else if (integration === 'lambda-proxy') {
-                response.statusCode = statusCode = result.statusCode;
+                response.statusCode = statusCode = result.statusCode || 200;
+
                 const defaultHeaders = { 'Content-Type': 'application/json' };
+
                 Object.assign(response.headers, defaultHeaders, result.headers);
                 if (!_.isUndefined(result.body)) {
                   response.source = result.body;
@@ -857,6 +889,9 @@ class Offline {
   }
 
   _create404Route() {
+    // If a {proxy+} route exists, don't conflict with it
+    if (this.server.match('*', '/{p*}')) return;
+
     this.server.route({
       method: '*',
       path: '/{p*}',
