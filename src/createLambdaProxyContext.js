@@ -27,6 +27,7 @@ module.exports = function createLambdaProxyContext(request, options, stageVariab
       resourceId: 'offlineContext_resourceId',
       stage: options.stage,
       requestId: `offlineContext_requestId_${utils.random().toString(10).slice(2)}`,
+      path: request.path,
       resourcePath: request.path.replace(`/${options.stage}`, '') || '/',
       identity: {
         cognitoIdentityPoolId: 'offlineContext_cognitoIdentityPoolId',
