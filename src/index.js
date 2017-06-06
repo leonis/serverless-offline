@@ -373,16 +373,31 @@ class Offline {
           };
         }
 
+        const routeMethod = method === 'ANY' ? '*' : method;
+        const routeConfig = {
+          cors,
+          auth: authStrategyName,
+        };
+
+        if (routeMethod !== 'HEAD' && routeMethod !== 'GET' && routeMethod !== 'DELETE') {
+          routeConfig.payload = {
+            output: 'data',
+            parse: false
+          };
+        }
+
         // Route creation
         this.server.route({
-          method: method === 'ANY' ? '*' : method,
+          method: routeMethod,
           path: fullPath,
-          config: {
-            cors,
-            auth: authStrategyName,
-          },
+          config: routeConfig,
           handler: (request, reply) => { // Here we go
-
+            if (_.includes(request.headers['content-type'], 'multipart/form-data')) {
+              request.payload = request.payload.toString('base64');
+            }
+            else {
+              request.payload = request.payload && request.payload.toString();
+            }
             this.printBlankLine();
             this.serverlessLog(`${method} ${request.path} (λ: ${funName})`);
             if (firstCall) {
